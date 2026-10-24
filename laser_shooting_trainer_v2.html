@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laser Shooting Trainer — Version 2</title>
+<style>
+:root{color-scheme:light;--ink:#17202a;--muted:#5d6d7e;--line:#d5dce3;--panel:#fff;--bg:#f3f6f8;--accent:#1769aa}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}main{max-width:760px;margin:auto;padding:14px}.top h1{font-size:1.35rem;margin:8px 0 5px}.top p{margin:0;color:var(--muted);font-size:.92rem}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px;margin:12px 0}.notice{background:#fff7df;border:1px solid #ead28a;border-radius:12px;padding:11px 12px;font-size:.88rem;line-height:1.45;margin:12px 0}.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}button,select{font:inherit;border-radius:10px;border:1px solid #b8c4cf;padding:10px 12px;background:#fff;color:var(--ink)}button{font-weight:650;cursor:pointer}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.45}label{font-size:.9rem;color:var(--muted)}.small{font-size:.84rem;color:var(--muted);line-height:1.45}.video-wrap{position:relative;background:#111;border-radius:10px;overflow:hidden;min-height:180px;display:flex;align-items:center;justify-content:center;margin-top:10px}video{width:100%;height:auto;max-height:55vh;display:block;object-fit:contain}#placeholder{color:#fff;padding:30px;text-align:center}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{background:#f5f8fa;border-radius:10px;padding:10px}.k{font-size:.78rem;color:var(--muted)}.v{font-size:1.15rem;font-weight:750}#target{width:min(100%,400px);height:auto;display:block;margin:auto;background:#fff;touch-action:manipulation}.target-wrap{padding:8px 0}.status{padding:10px;border-radius:10px;background:#f3f6f8;font-size:.9rem;line-height:1.4}.good{background:#e9f7ef}.bad{background:#fff0ed}.shot{display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid #edf0f3}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:0 0 auto}@media(min-width:600px){main{padding:20px}.panel{padding:16px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><h1>Laser Shooting Trainer</h1><p>Version 2 · Camera visibility test + manual scoring</p></header>
+<div class="notice"><strong>Laser safety:</strong> Point the laser only at a paper target, never at anyone's eyes, reflective surfaces, or the phone camera lens. Keep the camera pointed at the target. Do not attach the pointer to a firearm or airgun. Use a low-power pointer and stop if the spot is not clearly visible.</div>
+
+<section class="panel">
+<h3 style="margin:0 0 8px">1. Camera test</h3>
+<p class="small">Mount the phone so it sees the target. Allow camera access, then point your laser at the paper target from the side of the phone. Tap “Analyse frame” to check for a red spot. Detection is experimental and may be affected by lighting or red printing.</p>
+<div class="controls">
+<button class="primary" id="start">Start camera</button><button id="stop" disabled>Stop camera</button><button id="analyse" disabled>Analyse frame</button>
+</div>
+<div class="video-wrap"><div id="placeholder">Camera preview will appear here</div><video id="video" autoplay playsinline muted hidden></video></div>
+<div class="stats" style="margin-top:10px">
+<div class="stat"><div class="k">Detection result</div><div class="v" id="detect">Not tested</div></div>
+<div class="stat"><div class="k">Red pixels found</div><div class="v" id="pixels">—</div></div>
+</div>
+<div id="camstatus" class="status" style="margin-top:10px" aria-live="polite">Ready. Start the camera to begin.</div>
+<canvas id="canvas" hidden></canvas>
+</section>
+
+<section class="panel">
+<div class="row" style="justify-content:space-between"><h3 style="margin:0">2. Manual scoring target</h3><select id="series"><option value="10">10 shots</option><option value="60">60 shots</option></select></div>
+<p class="small">This target remains manual for now. Tap the approximate hit location. Scores are illustrative, not official ISSF scores.</p>
+<div class="target-wrap">
+<svg id="target" viewBox="0 0 400 400" role="img" aria-label="Tap target to record shot">
+<rect width="400" height="400" fill="#fff"/>
+<g transform="translate(200 200)">
+<circle r="174" fill="#fff" stroke="#111" stroke-width="1.4"/>
+<circle r="155" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="136" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="117" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="98" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="79" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="60" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="41" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="22" fill="#fff" stroke="#111" stroke-width="1.2"/>
+<circle r="7" fill="#111"/>
+</g><g id="marks"></g></svg>
+</div>
+<div class="stats">
+<div class="stat"><div class="k">Total score</div><div class="v" id="total">0.0</div></div>
+<div class="stat"><div class="k">Average / shot</div><div class="v" id="avg">—</div></div>
+</div>
+<p class="small" id="count">0 / 10 shots</p>
+<div class="controls"><button id="undo" disabled>Undo last</button><button id="reset" disabled>Reset series</button><button id="export" disabled>Export CSV</button></div>
+<div id="log"></div>
+</section>
+<p class="small">Privacy: the camera stream is processed in this page and is not uploaded by this prototype. Camera permission is needed only while testing. If the camera does not start from a downloaded file, open this page through a secure HTTPS page or a trusted local web server.</p>
+</main>
+<script>
+(() => {
+const video=document.getElementById('video'), canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d',{willReadFrequently:true});
+const start=document.getElementById('start'),stop=document.getElementById('stop'),analyse=document.getElementById('analyse');
+const camstatus=document.getElementById('camstatus'), detect=document.getElementById('detect'), pixels=document.getElementById('pixels'), placeholder=document.getElementById('placeholder');
+let stream=null; const shots=[]; const svg=document.getElementById('target'),marks=document.getElementById('marks');
+const $=id=>document.getElementById(id);
+function camMsg(msg,kind=''){camstatus.textContent=msg;camstatus.className='status '+kind}
+start.addEventListener('click',async()=>{
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){camMsg('This browser context does not allow camera access. Try opening the page in Chrome from a secure HTTPS origin.','bad');return}
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  video.srcObject=stream;video.hidden=false;placeholder.hidden=true;
+  await video.play();start.disabled=true;stop.disabled=false;analyse.disabled=false;
+  camMsg('Camera is running. Aim it at the paper target, then test a laser spot. Do not point the laser into the lens.','good');
+ }catch(e){camMsg('Camera could not start: '+(e.message||e.name)+'. Check browser camera permission and close other apps using the camera.','bad')}
+});
+stop.addEventListener('click',()=>{if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.srcObject=null;video.hidden=true;placeholder.hidden=false;start.disabled=false;stop.disabled=true;analyse.disabled=true;camMsg('Camera stopped.');detect.textContent='Not tested';pixels.textContent='—'});
+analyse.addEventListener('click',()=>{
+ if(!video.videoWidth){camMsg('Wait until the camera preview appears, then analyse again.','bad');return}
+ const maxW=480,scale=Math.min(1,maxW/video.videoWidth);canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);
+ ctx.drawImage(video,0,0,canvas.width,canvas.height);
+ const d=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+ let count=0,sx=0,sy=0,peak=0;
+ // Basic red-pixel heuristic; not reliable enough for automatic scoring.
+ for(let y=0;y<canvas.height;y+=1){for(let x=0;x<canvas.width;x+=1){
+  const i=(y*canvas.width+x)*4,r=d[i],g=d[i+1],b=d[i+2];
+  if(r>175 && r>g*1.65 && r>b*1.45 && g<145 && b<145){count++;sx+=x;sy+=y;peak=Math.max(peak,r)}
+ }}
+ pixels.textContent=count.toLocaleString();
+ if(count>=2){detect.textContent='Red area found';camMsg('Possible red region detected near preview position '+Math.round(sx/count)+', '+Math.round(sy/count)+'. This may be the laser spot or red printing/noise; verify visually.','good')}
+ else{detect.textContent='No clear red spot';camMsg('No clear red region found in this frame. Try a darker room with the target still visible, adjust focus/exposure if your camera permits, and analyse again. Do not aim the laser at the camera lens.','bad')}
+});
+function scoreAt(x,y){const r=Math.hypot(x-200,y-200);if(r>174)return 0;return Math.max(0,Math.min(10.9,Math.floor((1-r/174)*100)/10+1))}
+function redraw(){
+ marks.innerHTML='';
+ shots.forEach((s,i)=>{const ns='http://www.w3.org/2000/svg',g=document.createElementNS(ns,'g'),c=document.createElementNS(ns,'circle'),t=document.createElementNS(ns,'text');c.setAttribute('cx',s.x);c.setAttribute('cy',s.y);c.setAttribute('r',5);c.setAttribute('fill','#d62828');c.setAttribute('stroke','#fff');c.setAttribute('stroke-width',1.5);t.setAttribute('x',s.x+7);t.setAttribute('y',s.y-6);t.setAttribute('font-size',11);t.setAttribute('font-weight',700);t.setAttribute('fill','#b71c1c');t.textContent=i+1;g.append(c,t);marks.append(g)});
+ const total=shots.reduce((a,s)=>a+s.score,0),n=shots.length;
+ $('total').textContent=total.toFixed(1);$('avg').textContent=n?(total/n).toFixed(2):'—';$('count').textContent=`${n} / ${$('series').value} shots`;
+ $('undo').disabled=!n;$('reset').disabled=!n;$('export').disabled=!n;
+ $('log').innerHTML=n?shots.map((s,i)=>`<div class="shot"><span>Shot ${i+1}</span><span>${s.score.toFixed(1)} <span class="small">(${s.dx.toFixed(0)}, ${s.dy.toFixed(0)})</span></span></div>`).join(''):'<p class="small">No shots recorded yet.</p>';
+}
+svg.addEventListener('click',e=>{if(shots.length>=Number($('series').value))return;const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse()),x=Math.max(0,Math.min(400,q.x)),y=Math.max(0,Math.min(400,q.y));shots.push({x,y,dx:x-200,dy:y-200,score:scoreAt(x,y)});redraw()});
+$('undo').addEventListener('click',()=>{shots.pop();redraw()});$('reset').addEventListener('click',()=>{shots.length=0;redraw()});$('series').addEventListener('change',redraw);
+$('export').addEventListener('click',()=>{const rows=[['Shot','Score','X from centre (screen units)','Y from centre (screen units)'],...shots.map((s,i)=>[i+1,s.score.toFixed(1),s.dx.toFixed(2),s.dy.toFixed(2)])];const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download='laser-trainer-shots.csv';a.click();URL.revokeObjectURL(url)});
+redraw();
+})();
+</script>
+</body></html>
