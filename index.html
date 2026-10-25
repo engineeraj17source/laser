@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#111827">
+<title>Laser Shooting Trainer V3</title>
+<style>
+:root{color-scheme:dark;--bg:#111827;--panel:#1f2937;--line:#374151;--text:#f9fafb;--muted:#9ca3af;--accent:#38bdf8;--good:#34d399;--warn:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:16px 14px 8px;max-width:900px;margin:auto}h1{font-size:1.35rem;margin:0 0 5px}p{margin:6px 0;color:var(--muted);line-height:1.4}.wrap{max-width:900px;margin:auto;padding:8px 12px 28px;display:grid;gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+h2{font-size:1rem;margin:0 0 10px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit;border-radius:10px;border:1px solid #4b5563;padding:10px 12px;background:#111827;color:var(--text)}
+button{cursor:pointer;font-weight:650}button.primary{background:#0369a1;border-color:#0284c7}button:disabled{opacity:.45;cursor:not-allowed}
+.status{font-size:.9rem;padding:9px 10px;background:#111827;border-radius:9px;color:#d1d5db;margin-top:8px}
+.status.good{color:var(--good)}.status.warn{color:var(--warn)}
+video{width:100%;display:block;max-height:55vh;object-fit:contain;background:#030712;border-radius:10px;touch-action:manipulation}
+.cam-holder{position:relative}.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.metric{background:#111827;border-radius:10px;padding:10px}.metric .num{font-size:1.35rem;font-weight:750}.metric .label{font-size:.78rem;color:var(--muted)}
+.target-area{display:grid;grid-template-columns:minmax(170px,260px) 1fr;gap:12px;align-items:start}
+.target{width:100%;aspect-ratio:1;border-radius:50%;background:#fff;position:relative;overflow:hidden;border:1px solid #d1d5db;touch-action:manipulation}
+.target svg{width:100%;height:100%;display:block}.shotmark{position:absolute;width:8px;height:8px;border-radius:50%;background:#ef4444;border:1px solid #fff;transform:translate(-50%,-50%);box-shadow:0 0 0 1px #991b1b}
+.small{font-size:.84rem;color:var(--muted)}.shotlist{max-height:230px;overflow:auto}.shotrow{display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--line);font-size:.9rem}
+label{font-size:.9rem;color:#e5e7eb;display:flex;gap:8px;align-items:center}input[type=range]{padding:0;max-width:180px}
+@media(max-width:540px){.target-area{grid-template-columns:1fr}.target{max-width:230px;margin:auto}.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.metric .num{font-size:1.1rem}}
+</style>
+</head>
+<body>
+<header><h1>Laser Shooting Trainer V3</h1><p>Live red-spot detection · approximate practice scoring · runs in your browser</p></header>
+<main class="wrap">
+<section class="panel">
+<h2>1. Camera</h2>
+<div class="row"><button id="start" class="primary">Start camera</button><button id="stop" disabled>Stop camera</button><button id="toggle" disabled>Start automatic training</button></div>
+<div class="status" id="status">Ready. Start the camera and point it at your paper target.</div>
+<div class="cam-holder" style="margin-top:10px"><video id="video" playsinline autoplay muted></video><canvas id="overlay" class="overlay"></canvas></div>
+<div class="row" style="margin-top:9px">
+<label>Red sensitivity <input id="sens" type="range" min="25" max="100" value="55"></label>
+<label>Minimum spot pixels <input id="minpix" type="range" min="3" max="100" value="12"></label>
+</div>
+<p class="small">Tip: keep the phone steady, aim the camera at the target, avoid bright red objects in the frame, and keep the target well lit. Detection is experimental.</p>
+</section>
+<section class="panel">
+<h2>2. Calibrate the target area</h2>
+<p>Tap the target area’s <b>top-left corner</b> in the camera preview, then tap its <b>bottom-right corner</b>. Keep the camera facing the target as square-on as possible. Calibration maps the selected rectangle to the scoring target.</p>
+<div class="row"><button id="cal1" disabled>Set top-left corner</button><button id="cal2" disabled>Set bottom-right corner</button><button id="clearcal" disabled>Clear calibration</button></div>
+<div class="status" id="calstatus">Camera must be running to calibrate.</div>
+</section>
+<section class="panel">
+<h2>3. Practice target</h2>
+<div class="target-area">
+<div id="target" class="target" aria-label="Scoring target">
+<svg viewBox="0 0 300 300" aria-hidden="true">
+<circle cx="150" cy="150" r="145" fill="white" stroke="#111827" stroke-width="1"/>
+<circle cx="150" cy="150" r="125" fill="white" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="105" fill="white" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="85" fill="white" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="65" fill="white" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="45" fill="white" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="25" fill="#111827" stroke="#111827" stroke-width="1.5"/>
+<circle cx="150" cy="150" r="8" fill="#111827" stroke="#111827" stroke-width="1"/>
+</svg>
+</div>
+<div>
+<div class="metrics">
+<div class="metric"><div class="num" id="shots">0</div><div class="label">Shots</div></div>
+<div class="metric"><div class="num" id="lastscore">—</div><div class="label">Last score</div></div>
+<div class="metric"><div class="num" id="average">—</div><div class="label">Average</div></div>
+</div>
+<p id="detection" style="margin-top:10px">Red pixels: 0 · Dot: not detected</p>
+<p class="small">The score is an approximate concentric-ring score, not official ISSF scoring.</p>
+<div class="row"><button id="undo" disabled>Undo last shot</button><button id="reset">Reset session</button><button id="csv" disabled>Export CSV</button></div>
+</div>
+</div>
+</section>
+<section class="panel">
+<h2>4. Shot history</h2>
+<div id="history" class="shotlist small">No shots recorded yet.</div>
+</section>
+<section class="panel">
+<h2>Safety and limitations</h2>
+<p>Use only a low-power laser pointer on a paper target. Never aim a laser at eyes, people, animals, mirrors, vehicles, or the camera lens. Do not attach the pointer to a real firearm or airgun. This is a home practice prototype, not an official scoring system.</p>
+</section>
+</main>
+<canvas id="work" hidden></canvas>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const video=$('video'), overlay=$('overlay'), octx=overlay.getContext('2d');
+const work=$('work'), wctx=work.getContext('2d',{willReadFrequently:true});
+let stream=null, running=false, raf=0, lastDetected=false, armed=true, shots=[], lastDetection=null;
+let calibration=null, calMode=0, p1=null, p2=null, frameW=0, frameH=0, lastShotTime=0, cooldownMs=700;
+const status=(s,kind='')=>{$('status').textContent=s;$('status').className='status '+kind};
+function buttons(){
+ $('start').disabled=!!stream; $('stop').disabled=!stream;
+ $('toggle').disabled=!stream; $('cal1').disabled=!stream; $('cal2').disabled=!stream; $('clearcal').disabled=!stream;
+}
+async function startCamera(){
+ try{
+  if(!navigator.mediaDevices?.getUserMedia){status('Camera API unavailable. Open this page using its HTTPS GitHub Pages URL.','warn');return}
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  video.srcObject=stream; await video.play(); buttons();
+  status('Camera is running. Set the target corners, then start automatic training.','good');
+  requestAnimationFrame(loop);
+ }catch(e){status('Camera failed: '+(e.name||'Error')+' — '+(e.message||'Check Chrome camera permission and close other camera apps.'),'warn');stream=null;buttons()}
+}
+function stopCamera(){
+ running=false; $('toggle').textContent='Start automatic training';
+ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+ video.srcObject=null; cancelAnimationFrame(raf); buttons(); octx.clearRect(0,0,overlay.width,overlay.height); status('Camera stopped.');
+}
+function resizeCanvas(){
+ const vw=video.videoWidth,vh=video.videoHeight;if(!vw||!vh)return;
+ if(vw!==frameW||vh!==frameH){frameW=vw;frameH=vh;overlay.width=vw;overlay.height=vh;work.width=Math.max(1,Math.floor(vw/2));work.height=Math.max(1,Math.floor(vh/2))}
+}
+function detect(){
+ const sw=work.width,sh=work.height;
+ wctx.drawImage(video,0,0,sw,sh);
+ let data;try{data=wctx.getImageData(0,0,sw,sh).data}catch(e){return null}
+ const sens=Number($('sens').value), minpix=Number($('minpix').value);
+ let count=0,sumX=0,sumY=0, minX=sw,minY=sh,maxX=0,maxY=0;
+ // Use strict red dominance and brightness; skip a thin edge to reduce artifacts.
+ for(let y=2;y<sh-2;y+=1){for(let x=2;x<sw-2;x+=1){
+  const i=(y*sw+x)*4,r=data[i],g=data[i+1],b=data[i+2];
+  if(r>sens*2.2 && r>g*1.55 && r>b*1.45 && r-g>35){
+   count++;sumX+=x;sumY+=y;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+  }
+ }}
+ if(count<minpix)return {count,detected:false};
+ const cx=sumX/count,cy=sumY/count;
+ // Detection centroid may be polluted by other red items. Require a compact-ish bounding box.
+ const boxArea=(maxX-minX+1)*(maxY-minY+1);
+ if(boxArea>sw*sh*0.08 && count<minpix*5)return {count,detected:false};
+ return {count,detected:true,x:cx/sw,y:cy/sh,box:{x:minX/sw,y:minY/sh,w:(maxX-minX+1)/sw,h:(maxY-minY+1)/sh}};
+}
+function drawOverlay(d){
+ octx.clearRect(0,0,overlay.width,overlay.height);
+ if(calibration){
+  octx.strokeStyle='#38bdf8';octx.lineWidth=Math.max(2,overlay.width/400);
+  octx.strokeRect(calibration.x1*overlay.width,calibration.y1*overlay.height,(calibration.x2-calibration.x1)*overlay.width,(calibration.y2-calibration.y1)*overlay.height);
+  octx.fillStyle='#38bdf8';octx.font=`${Math.max(14,overlay.width/45)}px sans-serif`;
+  octx.fillText('CALIBRATED TARGET',calibration.x1*overlay.width+5,Math.max(20,calibration.y1*overlay.height-7));
+ }
+ if(d?.detected){
+  octx.strokeStyle='#f43f5e';octx.lineWidth=Math.max(2,overlay.width/500);
+  octx.beginPath();octx.arc(d.x*overlay.width,d.y*overlay.height,Math.max(8,overlay.width/55),0,Math.PI*2);octx.stroke();
+  octx.beginPath();octx.moveTo(d.x*overlay.width-12,d.y*overlay.height);octx.lineTo(d.x*overlay.width+12,d.y*overlay.height);octx.moveTo(d.x*overlay.width,d.y*overlay.height-12);octx.lineTo(d.x*overlay.width,d.y*overlay.height+12);octx.stroke();
+ }
+}
+function scoreShot(x,y){
+ const target=$('target'), rect=target.getBoundingClientRect();
+ const nx=Math.max(-1,Math.min(1,(x-.5)*2)),ny=Math.max(-1,Math.min(1,(y-.5)*2));
+ const radius=Math.sqrt(nx*nx+ny*ny), score=Math.max(0,Math.min(10,Math.ceil(10-radius*10)));
+ const mark=document.createElement('div');mark.className='shotmark';mark.style.left=(x*100)+'%';mark.style.top=(y*100)+'%';target.appendChild(mark);
+ return score;
+}
+function recordShot(d){
+ const now=Date.now();if(now-lastShotTime<cooldownMs)return;
+ let nx=d.x,ny=d.y;
+ if(calibration){
+  const c=calibration;
+  if(d.x<c.x1||d.x>c.x2||d.y<c.y1||d.y>c.y2){status('Red spot detected outside the calibrated target.','warn');return}
+  nx=(d.x-c.x1)/(c.x2-c.x1);ny=(d.y-c.y1)/(c.y2-c.y1);
+ } else {status('Dot detected, but target is not calibrated. Set target corners before recording shots.','warn');return}
+ const score=scoreShot(nx,ny), item={n:shots.length+1,score,x:nx,y:ny,time:new Date().toLocaleTimeString()};
+ shots.push(item);lastShotTime=now;updateStats();status(`Shot ${item.n} recorded — approximate score ${score}/10.`,'good');
+}
+function updateStats(){
+ $('shots').textContent=shots.length;
+ $('lastscore').textContent=shots.length?shots[shots.length-1].score:'—';
+ $('average').textContent=shots.length?(shots.reduce((a,s)=>a+s.score,0)/shots.length).toFixed(1):'—';
+ $('undo').disabled=!shots.length;$('csv').disabled=!shots.length;
+ $('history').innerHTML=shots.length?shots.slice().reverse().map(s=>`<div class="shotrow"><span>Shot ${s.n} · ${s.time}</span><b>${s.score}/10</b></div>`).join(''):'No shots recorded yet.';
+}
+function loop(){
+ if(!stream)return;
+ resizeCanvas();
+ if(video.readyState>=2){
+  const d=detect();lastDetection=d;drawOverlay(d);
+  $('detection').textContent=`Red pixels: ${d?.count||0} · Dot: ${d?.detected?'detected':'not detected'}`;
+  if(running){
+   if(d?.detected && armed){recordShot(d);armed=false;lastDetected=true}
+   else if(!d?.detected){armed=true;lastDetected=false}
+  }
+ }
+ raf=requestAnimationFrame(loop);
+}
+function videoPoint(evt){
+ const r=video.getBoundingClientRect();
+ // video object-fit contain means image can have letterboxing; account for it.
+ const vw=video.videoWidth,vh=video.videoHeight, boxRatio=r.width/r.height, videoRatio=vw/vh;
+ let left=r.left,top=r.top,w=r.width,h=r.height;
+ if(videoRatio>boxRatio){h=r.width/videoRatio;top=r.top+(r.height-h)/2}else{w=r.height*videoRatio;left=r.left+(r.width-w)/2}
+ return {x:Math.max(0,Math.min(1,(evt.clientX-left)/w)),y:Math.max(0,Math.min(1,(evt.clientY-top)/h))};
+}
+video.addEventListener('click',e=>{
+ if(!stream||!calMode)return;
+ const p=videoPoint(e);
+ if(calMode===1){p1=p;$('calstatus').textContent=`Top-left set: (${p.x.toFixed(3)}, ${p.y.toFixed(3)}). Now set bottom-right.`;$('cal1').textContent='Top-left set';calMode=0;return}
+ if(calMode===2){
+  if(!p1){$('calstatus').textContent='Set top-left first.';calMode=0;return}
+  if(p.x<=p1.x||p.y<=p1.y){$('calstatus').textContent='Bottom-right must be below and to the right of top-left. Try again.';calMode=0;return}
+  p2=p;calibration={x1:p1.x,y1:p1.y,x2:p.x,y2:p.y};$('calstatus').textContent='Calibration saved. Keep the phone and target fixed.';$('cal1').textContent='Set top-left corner';$('cal2').textContent='Set bottom-right corner';calMode=0;return
+ }
+});
+$('start').addEventListener('click',startCamera);$('stop').addEventListener('click',stopCamera);
+$('toggle').addEventListener('click',()=>{
+ if(!stream)return;
+ if(!calibration){status('First calibrate the target area using the two corner buttons.','warn');return}
+ running=!running;armed=true;$('toggle').textContent=running?'Stop automatic training':'Start automatic training';
+ status(running?'Automatic training is ON. Dot appearance records a shot; move it away until it disappears to re-arm.':'Automatic training paused.',running?'good':'');
+});
+$('cal1').addEventListener('click',()=>{calMode=1;$('calstatus').textContent='Tap the top-left corner of the target area in the camera preview.';});
+$('cal2').addEventListener('click',()=>{if(!p1){$('calstatus').textContent='Set top-left corner first.';return}calMode=2;$('calstatus').textContent='Tap the bottom-right corner of the target area in the camera preview.';});
+$('clearcal').addEventListener('click',()=>{calibration=null;p1=null;p2=null;calMode=0;$('calstatus').textContent='Calibration cleared.'});
+$('reset').addEventListener('click',()=>{shots=[];$('target').querySelectorAll('.shotmark').forEach(e=>e.remove());updateStats();armed=true;lastShotTime=0;status('Session reset.')});
+$('undo').addEventListener('click',()=>{if(!shots.length)return;shots.pop();const marks=$('target').querySelectorAll('.shotmark');if(marks.length)marks[marks.length-1].remove();updateStats();status('Last shot removed.')});
+$('csv').addEventListener('click',()=>{const rows=[['Shot','Time','Score','Target X','Target Y'],...shots.map(s=>[s.n,s.time,s.score,s.x.toFixed(4),s.y.toFixed(4)])];const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='laser-training-shots.csv';a.click();URL.revokeObjectURL(a.href)});
+buttons();updateStats();
+})();
+</script>
+</body></html>
